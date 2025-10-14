@@ -1,0 +1,293 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user in the MediCheck AI system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user entity."
+        },
+        "email": {
+          "type": "string",
+          "description": "User's email address.",
+          "format": "email"
+        }
+      },
+      "required": [
+        "id",
+        "email"
+      ]
+    },
+    "Prescription": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Prescription",
+      "type": "object",
+      "description": "Represents a prescription uploaded by a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the prescription entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Prescription)"
+        },
+        "prescriptionText": {
+          "type": "string",
+          "description": "Text content of the prescription."
+        },
+        "uploadTimestamp": {
+          "type": "string",
+          "description": "Timestamp of when the prescription was uploaded.",
+          "format": "date-time"
+        },
+        "prescriptionSafetyScore": {
+          "type": "number",
+          "description": "Prescription Safety Score (PSS) assigned to the prescription."
+        },
+        "dosageIssues": {
+          "type": "array",
+          "description": "List of dosage-related issues identified in the prescription.",
+          "items": {
+            "type": "string"
+          }
+        },
+        "drugConflicts": {
+          "type": "array",
+          "description": "List of potential drug conflicts identified in the prescription.",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "prescriptionText",
+        "uploadTimestamp"
+      ]
+    },
+    "Medication": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Medication",
+      "type": "object",
+      "description": "Represents a medication in the user's inventory.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the medication entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N Medication)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the medication."
+        },
+        "expiryDate": {
+          "type": "string",
+          "description": "Expiration date of the medication.",
+          "format": "date-time"
+        },
+        "stockQuantity": {
+          "type": "number",
+          "description": "Current stock quantity of the medication."
+        },
+        "alertThreshold": {
+          "type": "number",
+          "description": "Custom alert threshold for the medication."
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "name",
+        "expiryDate",
+        "stockQuantity"
+      ]
+    },
+    "HealthTrend": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "HealthTrend",
+      "type": "object",
+      "description": "Represents a user's health trend data.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the health trend entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N HealthTrend)"
+        },
+        "symptom": {
+          "type": "string",
+          "description": "Tracked symptom."
+        },
+        "severity": {
+          "type": "number",
+          "description": "Severity score of the symptom."
+        },
+        "dateTracked": {
+          "type": "string",
+          "description": "Date when the symptom was tracked.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "symptom",
+        "severity",
+        "dateTracked"
+      ]
+    },
+    "ChatMessage": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ChatMessage",
+      "type": "object",
+      "description": "Represents a message in the chat assistant.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the chat message entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to User. (Relationship: User 1:N ChatMessage)"
+        },
+        "messageText": {
+          "type": "string",
+          "description": "Content of the chat message."
+        },
+        "isUserMessage": {
+          "type": "boolean",
+          "description": "Indicates whether the message was sent by the user or the AI assistant."
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Timestamp of when the message was sent.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "messageText",
+        "isUserMessage",
+        "timestamp"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profiles. Uses path-based ownership for data privacy.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/prescriptions/{prescriptionId}",
+        "definition": {
+          "entityName": "Prescription",
+          "schema": {
+            "$ref": "#/backend/entities/Prescription"
+          },
+          "description": "Stores prescriptions uploaded by the user. Uses path-based ownership to ensure only the user can access their prescriptions.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "prescriptionId",
+              "description": "The unique identifier for the prescription."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/medications/{medicationId}",
+        "definition": {
+          "entityName": "Medication",
+          "schema": {
+            "$ref": "#/backend/entities/Medication"
+          },
+          "description": "Stores medication inventory for each user. Uses path-based ownership for data privacy.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "medicationId",
+              "description": "The unique identifier for the medication."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/healthTrends/{healthTrendId}",
+        "definition": {
+          "entityName": "HealthTrend",
+          "schema": {
+            "$ref": "#/backend/entities/HealthTrend"
+          },
+          "description": "Stores health trend data for each user. Uses path-based ownership.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "healthTrendId",
+              "description": "The unique identifier for the health trend."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/users/{userId}/chatMessages/{chatMessageId}",
+        "definition": {
+          "entityName": "ChatMessage",
+          "schema": {
+            "$ref": "#/backend/entities/ChatMessage"
+          },
+          "description": "Stores chat messages for each user. Uses path-based ownership.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The unique identifier for the user."
+            },
+            {
+              "name": "chatMessageId",
+              "description": "The unique identifier for the chat message."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore structure is designed to ensure authorization independence, clarity, and scalability for the MediCheck AI application. It leverages path-based ownership for user-specific data and avoids `get()` calls in security rules by denormalizing authorization data where necessary. Each collection is designed to have a homogeneous security posture.\n\n- User data is stored under `/users/{userId}`. This provides clear ownership and simplifies security rules.\n- Prescriptions, medications, health trends, and chat messages are stored as subcollections under each user's document (`/users/{userId}/prescriptions`, etc.). This ensures that only the user can access their own data. This leverages path-based ownership, ensuring security.\n\nThis structure supports the required QAPs (Queries are not filters) by:\n\n1. Segregating data with different access requirements into different collections or subcollections.\n2. Using path-based ownership for user-specific data, enabling efficient and secure list operations based on the authenticated user's ID."
+  }
+}
