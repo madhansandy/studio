@@ -13,6 +13,7 @@ export interface Prescription {
   date: string;
   safetyScore: number;
   issues: string[];
+  provider?: string;
 }
 
 export interface InventoryItem {
@@ -41,10 +42,10 @@ const MOCK_USER: User = {
 };
 
 const MOCK_PRESCRIPTIONS: Prescription[] = [
-    { id: 'p1', name: 'Lisinopril 10mg', date: '2024-07-15', safetyScore: 95, issues: [] },
-    { id: 'p2', name: 'Metformin 500mg', date: '2024-07-10', safetyScore: 75, issues: ['Potential interaction with Alcohol.'] },
-    { id: 'p3', name: 'Simvastatin 20mg', date: '2024-06-28', safetyScore: 45, issues: ['High dosage warning.', 'Avoid grapefruit juice.'] },
-    { id: 'p4', name: 'Amoxicillin 250mg', date: '2024-06-20', safetyScore: 90, issues: [] },
+    { id: 'p1', name: 'Lisinopril 10mg', date: '2024-07-15', safetyScore: 95, issues: [], provider: 'Dr. Emily Carter' },
+    { id: 'p2', name: 'Metformin 500mg', date: '2024-07-10', safetyScore: 75, issues: ['Potential interaction with Alcohol.'], provider: 'Dr. Benjamin Lee' },
+    { id: 'p3', name: 'Simvastatin 20mg', date: '2024-06-28', safetyScore: 45, issues: ['High dosage warning.', 'Avoid grapefruit juice.'], provider: 'Dr. Sarah T. Hall' },
+    { id: 'p4', name: 'Amoxicillin 250mg', date: '2024-06-20', safetyScore: 90, issues: [], provider: 'QuickCare Clinic' },
 ];
 
 const MOCK_INVENTORY: InventoryItem[] = [

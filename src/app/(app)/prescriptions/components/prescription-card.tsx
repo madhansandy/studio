@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Separator } from "@/components/ui/separator";
 import type { Prescription } from "@/lib/api";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, CheckCircle2, ShieldAlert } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ShieldAlert, Stethoscope } from "lucide-react";
 
 interface PrescriptionCardProps {
   prescription: Prescription;
@@ -59,7 +59,7 @@ export default function PrescriptionCard({ prescription }: PrescriptionCardProps
             </Badge>
         </div>
       </CardHeader>
-      <CardContent className="flex-grow pt-4">
+      <CardContent className="flex-grow pt-4 space-y-4">
         <div className="flex items-center gap-4">
           <div className={cn("flex flex-col items-center p-2 rounded-lg", safetyInfo.bgColor, safetyInfo.color)}>
             <safetyInfo.Icon className="h-8 w-8" />
@@ -79,6 +79,16 @@ export default function PrescriptionCard({ prescription }: PrescriptionCardProps
             )}
           </div>
         </div>
+        {prescription.provider && (
+          <div>
+              <Separator />
+              <div className="pt-4 flex items-center gap-2 text-sm">
+                  <Stethoscope className="h-4 w-4 text-muted-foreground"/> 
+                  <span className="font-medium">Prescribed by:</span>
+                  <span className="text-muted-foreground">{prescription.provider}</span>
+              </div>
+          </div>
+        )}
       </CardContent>
       <CardFooter>
           <p className="text-xs text-muted-foreground">*PSS: Prescription Safety Score</p>
