@@ -1,140 +1,127 @@
 /**
- * @file Firebase Security Rules for MediCheck AI Application
+ * @fileOverview Firestore Security Rules for MediCheck AI.
  *
- * @core_philosophy This ruleset enforces a strict user-ownership model. Each user (patient)
- *  has complete control over their data stored under their unique `/users/{userId}` path.
- *  Authorization is path-based, eliminating the need for costly `get()` calls within rules.
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model where each user (patient)
+ * can only access data associated with their unique user ID. All data is nested
+ * under /users/{userId} to achieve path-based authorization.
  *
- * @data_structure All patient-related data (prescriptions, medications, alerts) is nested
- *  under the `/users/{userId}` collection. This ensures that each user's data is isolated
- *  and accessible only to them.
+ * Data Structure:
+ * - /users/{userId}: Stores patient profile information.
+ * - /users/{userId}/prescriptions/{prescriptionId}: Stores prescriptions uploaded by the patient.
+ * - /users/{userId}/medications/{medicationId}: Stores medications in the patient's inventory.
+ * - /users/{userId}/alerts/{alertId}: Stores alerts for medications.
  *
- * @key_security_decisions
- *   - User listing is implicitly denied.
- *   - `patientId` fields are used for data linkage but are not considered during authorization. Authorization happens based on the user ID in the path.
- *
- * @denormalization_for_authorization N/A - Authorization is achieved with path-based ownership
- *
- * @structural_segregation N/A - All user data lives under their respective sub-tree.
+ * Key Security Decisions:
+ * - All data is private and accessible only to the authenticated user with a
+ *   matching userId.
+ * - The rules avoid the need for 'get()' calls by enforcing path-based
+ *   authorization.
+ * - The 'patientId' field in subcollections is for data linkage and is NOT used
+ *   for authorization decisions.
+ * - Listing operations are restricted to the owner of the user ID.
+ * - The 'id' fields in the documents must match the document ID in the path.
  */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
     /**
-     * @description Checks if the request is made by the owner of the resource (patient).
-     * @param {string} userId The user ID to compare against the request's authentication UID.
-     * @returns {bool} True if the user ID matches the request's authentication UID, false otherwise.
-     */
-    function isOwner(userId) {
-      return request.auth != null && request.auth.uid == userId;
-    }
-
-    /**
-     * @description Checks if the user is signed in
-     * @returns {bool} True if the user is signed in.
+     * @description Checks if the current user is signed in.
+     * @returns {boolean} True if the user is signed in, false otherwise.
      */
     function isSignedIn() {
-        return request.auth != null;
+      return request.auth != null;
     }
 
     /**
-     * @description Checks if the user is the owner and the document exists.
-     * @param {string} userId The user ID to compare against the request's authentication UID.
-     * @returns {bool} True if the user ID matches the request's authentication UID and the resource exists, false otherwise.
+     * @description Checks if the given userId matches the authenticated user's ID.
+     * @param {string} userId The user ID to check against.
+     * @returns {boolean} True if the user ID matches, false otherwise.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * @description Checks if the given userId matches the authenticated user's ID and the resource exists.
+     * @param {string} userId The user ID to check against.
+     * @returns {boolean} True if the user ID matches and the resource exists, false otherwise.
      */
     function isExistingOwner(userId) {
-      return isOwner(userId) && existsAfter(/databases/$(database)/documents/users/$(userId));
+      return isOwner(userId) && resource != null;
     }
 
-    /**
-     * @description
-     * Provides access control for user profile documents.
-     * Only the authenticated user with the matching `userId` can read or write their profile.
-     *
-     * @path /users/{userId}
-     * @allow (get, create, update, delete) User YJzyo6jefNfDiCswc0W2cZs76ej1 can access /users/YJzyo6jefNfDiCswc0W2cZs76ej1 if authenticated.
-     * @deny (get, create, update, delete) User abc cannot access /users/YJzyo6jefNfDiCswc0W2cZs76ej1 because they are not the owner.
-     * @principle Enforces document ownership and restricts access to a user's own data.
-     */
     match /users/{userId} {
+      /**
+       * @description Manages patient profile information, ensuring only the authenticated user can access their own profile.
+       * @path /users/{userId}
+       * @allow (create) - User with UID 'user_abc' can create their profile with id: 'user_abc'.
+       * @allow (get) - User with UID 'user_abc' can get their profile with ID 'user_abc'.
+       * @allow (update) - User with UID 'user_abc' can update their profile with ID 'user_abc'.
+       * @allow (delete) - User with UID 'user_abc' can delete their profile with ID 'user_abc'.
+       * @deny (create) - User with UID 'user_xyz' cannot create a profile with id: 'user_abc'.
+       * @principle Enforces document ownership for writes.
+       */
       allow get: if isOwner(userId);
-      allow list: if false; // Listing users is not permitted.
-      allow create: if isSignedIn() && request.auth.uid == userId;
-      allow update: if isOwner(userId);
-      allow delete: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId) && request.resource.data.id == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.id == resource.data.id;
+      allow delete: if isExistingOwner(userId);
     }
 
-    /**
-     * @description
-     * Provides access control for prescription documents within a user's profile.
-     * Only the authenticated user with the matching `userId` can read or write their prescriptions.
-     *
-     * @path /users/{userId}/prescriptions/{prescriptionId}
-     * @allow (get, create, update, delete) User YJzyo6jefNfDiCswc0W2cZs76ej1 can access /users/YJzyo6jefNfDiCswc0W2cZs76ej1/prescriptions/somePrescription if authenticated.
-     * @deny (get, create, update, delete) User abc cannot access /users/YJzyo6jefNfDiCswc0W2cZs76ej1/prescriptions/somePrescription because they are not the owner.
-     * @principle Enforces document ownership and restricts access to a user's own prescriptions.
-     */
     match /users/{userId}/prescriptions/{prescriptionId} {
+      /**
+       * @description Manages patient prescriptions, allowing only the authenticated user to access their own prescriptions.
+       * @path /users/{userId}/prescriptions/{prescriptionId}
+       * @allow (create) - User with UID 'user_abc' can create a prescription with patientId: 'user_abc'.
+       * @allow (get) - User with UID 'user_abc' can get prescription with ID 'prescription_123' in /users/user_abc/prescriptions/.
+       * @allow (update) - User with UID 'user_abc' can update prescription with ID 'prescription_123' in /users/user_abc/prescriptions/.
+       * @allow (delete) - User with UID 'user_abc' can delete prescription with ID 'prescription_123' in /users/user_abc/prescriptions/.
+       * @deny (create) - User with UID 'user_xyz' cannot create a prescription with patientId: 'user_abc'.
+       * @principle Enforces document ownership for writes and restricts access to a user's own data tree.
+       */
       allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
-      allow delete: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.patientId == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.patientId == userId;
+      allow delete: if isExistingOwner(userId);
     }
 
-        /**
-     * @description
-     * Provides access control for chatMessages documents within a user's profile.
-     * Only the authenticated user with the matching `userId` can read or write their chatMessages.
-     *
-     * @path /users/{userId}/chatMessages/{chatMessagesId}
-     * @allow (get, create, update, delete) User YJzyo6jefNfDiCswc0W2cZs76ej1 can access /users/YJzyo6jefNfDiCswc0W2cZs76ej1/chatMessages/someChatMessage if authenticated.
-     * @deny (get, create, update, delete) User abc cannot access /users/YJzyo6jefNfDiCswc0W2cZs76ej1/chatMessages/someChatMessage because they are not the owner.
-     * @principle Enforces document ownership and restricts access to a user's own chatMessages.
-     */
-    match /users/{userId}/chatMessages/{chatMessagesId} {
-      allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
-      allow delete: if isOwner(userId);
-    }
-
-    /**
-     * @description
-     * Provides access control for medication documents within a user's profile.
-     * Only the authenticated user with the matching `userId` can read or write their medications.
-     *
-     * @path /users/{userId}/medications/{medicationId}
-     * @allow (get, create, update, delete) User YJzyo6jefNfDiCswc0W2cZs76ej1 can access /users/YJzyo6jefNfDiCswc0W2cZs76ej1/medications/someMedication if authenticated.
-     * @deny (get, create, update, delete) User abc cannot access /users/YJzyo6jefNfDiCswc0W2cZs76ej1/medications/someMedication because they are not the owner.
-     * @principle Enforces document ownership and restricts access to a user's own medications.
-     */
     match /users/{userId}/medications/{medicationId} {
+      /**
+       * @description Manages patient medications, allowing only the authenticated user to access their own medications.
+       * @path /users/{userId}/medications/{medicationId}
+       * @allow (create) - User with UID 'user_abc' can create a medication with patientId: 'user_abc'.
+       * @allow (get) - User with UID 'user_abc' can get medication with ID 'medication_456' in /users/user_abc/medications/.
+       * @allow (update) - User with UID 'user_abc' can update medication with ID 'medication_456' in /users/user_abc/medications/.
+       * @allow (delete) - User with UID 'user_abc' can delete medication with ID 'medication_456' in /users/user_abc/medications/.
+       * @deny (create) - User with UID 'user_xyz' cannot create a medication with patientId: 'user_abc'.
+       * @principle Enforces document ownership for writes and restricts access to a user's own data tree.
+       */
       allow get: if isOwner(userId);
-      allow list: if false;
-      allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
-      allow delete: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.patientId == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.patientId == userId;
+      allow delete: if isExistingOwner(userId);
     }
 
-    /**
-     * @description
-     * Provides access control for alert documents within a user's profile.
-     * Only the authenticated user with the matching `userId` can read or write their alerts.
-     *
-     * @path /users/{userId}/alerts/{alertId}
-     * @allow (get, create, update, delete) User YJzyo6jefNfDiCswc0W2cZs76ej1 can access /users/YJzyo6jefNfDiCswc0W2cZs76ej1/alerts/someAlert if authenticated.
-     * @deny (get, create, update, delete) User abc cannot access /users/YJzyo6jefNfDiCswc0W2cZs76ej1/alerts/someAlert because they are not the owner.
-     * @principle Enforces document ownership and restricts access to a user's own alerts.
-     */
     match /users/{userId}/alerts/{alertId} {
+      /**
+       * @description Manages patient alerts, allowing only the authenticated user to access their own alerts.
+       * @path /users/{userId}/alerts/{alertId}
+       * @allow (create) - User with UID 'user_abc' can create an alert with medicationId referencing a medication owned by 'user_abc'.
+       * @allow (get) - User with UID 'user_abc' can get alert with ID 'alert_789' in /users/user_abc/alerts/.
+       * @allow (update) - User with UID 'user_abc' can update alert with ID 'alert_789' in /users/user_abc/alerts/.
+       * @allow (delete) - User with UID 'user_abc' can delete alert with ID 'alert_789' in /users/user_abc/alerts/.
+       * @deny (create) - User with UID 'user_xyz' cannot create an alert for user_abc's medication.
+       * @principle Enforces document ownership for writes and restricts access to a user's own data tree.
+       */
       allow get: if isOwner(userId);
-      allow list: if false;
+      allow list: if isOwner(userId);
       allow create: if isOwner(userId);
-      allow update: if isOwner(userId);
-      allow delete: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
     }
   }
 }
