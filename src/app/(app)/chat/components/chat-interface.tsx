@@ -20,8 +20,13 @@ interface ChatMessage {
     sender: 'user' | 'ai';
     text: string;
     timestamp?: Timestamp | any;
-    isUserMessage?: boolean;
-    messageText?: string;
+}
+
+interface ChatMessageDoc {
+    id?: string;
+    isUserMessage: boolean;
+    messageText: string;
+    timestamp: Timestamp;
 }
 
 // A specific type for Firestore medication documents
@@ -45,7 +50,7 @@ export default function ChatInterface() {
         if (!firestore || !user) return null;
         return query(collection(firestore, `users/${user.uid}/chatMessages`), orderBy("timestamp", "asc"));
     }, [firestore, user]);
-    const { data: messages, isLoading: messagesLoading, error: messagesError } = useCollection<ChatMessage>(chatMessagesQuery);
+    const { data: messages, isLoading: messagesLoading, error: messagesError } = useCollection<ChatMessageDoc>(chatMessagesQuery);
     
     const prescriptionsQuery = useMemoFirebase(() => {
         if (!firestore || !user) return null;
@@ -69,9 +74,10 @@ export default function ChatInterface() {
     useEffect(() => {
         if (messages && messages.length > 0) {
              setClientMessages(messages.map(m => ({ 
-                ...m, 
+                id: m.id,
                 sender: m.isUserMessage ? 'user' : 'ai', 
-                text: m.messageText || '' 
+                text: m.messageText || '',
+                timestamp: m.timestamp
             })));
         } else if (!messagesLoading) {
              setClientMessages([{ sender: 'ai', text: 'Hello! How can I help you with your medications today?' }]);
@@ -247,5 +253,3 @@ export default function ChatInterface() {
         </Card>
     );
 }
-
-    
