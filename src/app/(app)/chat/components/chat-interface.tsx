@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState, useRef, useEffect } from "react";
@@ -11,7 +12,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useUser, useFirestore, useCollection, addDocumentNonBlocking, useMemoFirebase } from "@/firebase";
 import { collection, query, orderBy, serverTimestamp, Timestamp } from "firebase/firestore";
-import type { Prescription, InventoryItem } from "@/lib/api";
+import type { Prescription } from "@/lib/api";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 interface ChatMessage {
@@ -21,6 +22,13 @@ interface ChatMessage {
     timestamp?: Timestamp | any;
     isUserMessage?: boolean;
     messageText?: string;
+}
+
+// A specific type for Firestore medication documents
+interface MedicationDoc {
+    name: string;
+    stockQuantity: number;
+    expiryDate: string; // Assuming expiryDate is a string in Firestore
 }
 
 export default function ChatInterface() {
@@ -49,7 +57,8 @@ export default function ChatInterface() {
         if (!firestore || !user) return null;
         return collection(firestore, `users/${user.uid}/medications`);
     }, [firestore, user]);
-    const { data: medications, error: medicationsError } = useCollection<InventoryItem>(medicationsQuery);
+    // Use the specific MedicationDoc type for fetching from Firestore
+    const { data: medications, error: medicationsError } = useCollection<MedicationDoc>(medicationsQuery);
     // --- End Data Fetching ---
 
     const chatMessagesCollectionRef = useMemoFirebase(() => {
@@ -58,14 +67,14 @@ export default function ChatInterface() {
     }, [firestore, user]);
     
     useEffect(() => {
-        if (messages) {
+        if (messages && messages.length > 0) {
              setClientMessages(messages.map(m => ({ 
                 ...m, 
                 sender: m.isUserMessage ? 'user' : 'ai', 
                 text: m.messageText || '' 
             })));
-        } else if (messages === null && !messagesLoading) {
-            setClientMessages([{ sender: 'ai', text: 'Hello! How can I help you with your medications today?' }]);
+        } else if (!messagesLoading) {
+             setClientMessages([{ sender: 'ai', text: 'Hello! How can I help you with your medications today?' }]);
         }
     }, [messages, messagesLoading]);
 
@@ -109,14 +118,15 @@ export default function ChatInterface() {
                     name: p.name,
                     date: p.uploadTimestamp?.toDate().toLocaleDateString() ?? 'N/A',
                     safetyScore: p.safetyScore,
-                    issues: p.issues,
+                    issues: p.issues || [],
                 }));
             }
 
             if (medications) {
+                 // Map the fetched medication data to the format expected by the AI flow
                  aiInput.medications = medications.map(m => ({
                     name: m.name,
-                    stockQuantity: m.stock,
+                    stockQuantity: m.stockQuantity,
                     expiryDate: m.expiryDate,
                 }));
             }
@@ -151,7 +161,7 @@ export default function ChatInterface() {
     };
     
     const hasError = messagesError || prescriptionsError || medicationsError;
-    const initialLoading = messagesLoading && !messages;
+    const initialLoading = messagesLoading && clientMessages.length === 0;
 
     return (
         <Card className="flex flex-col flex-grow">
@@ -164,6 +174,7 @@ export default function ChatInterface() {
                                 <AlertTitle>Error</AlertTitle>
                                 <AlertDescription>
                                     There was a problem loading your data. Some features might not work correctly.
+                                    { (messagesError || prescriptionsError || medicationsError)?.message }
                                 </AlertDescription>
                             </Alert>
                         )}
@@ -236,3 +247,5 @@ export default function ChatInterface() {
         </Card>
     );
 }
+
+    
