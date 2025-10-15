@@ -2,36 +2,42 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth } from '@/firebase';
+import { signInWithEmailAndPassword, getAuth } from 'firebase/auth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { HeartPulse, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { FirebaseClientProvider } from '@/firebase';
+import { useRouter } from 'next/navigation';
 
-export default function LoginPage() {
-  const { login } = useAuth();
+function LoginComponent() {
+  const auth = useAuth(); // This hook now returns the auth instance
   const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!auth) return;
     setIsLoading(true);
     try {
-      await login(email, password);
+      await signInWithEmailAndPassword(auth, email, password);
       toast({
         title: "Login Successful",
         description: "Welcome back!",
       });
-    } catch (error) {
+      router.push('/dashboard');
+    } catch (error: any) {
       console.error(error);
       toast({
         variant: "destructive",
         title: "Login Failed",
-        description: "Please check your email and password.",
+        description: error.message || "Please check your email and password.",
       });
       setIsLoading(false);
     }
@@ -79,8 +85,7 @@ export default function LoginPage() {
                 />
               </div>
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Sign In
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Sign In"}
               </Button>
             </div>
           </form>
@@ -94,4 +99,12 @@ export default function LoginPage() {
       </Card>
     </div>
   );
+}
+
+export default function LoginPage() {
+  return (
+    <FirebaseClientProvider>
+      <LoginComponent />
+    </FirebaseClientProvider>
+  )
 }

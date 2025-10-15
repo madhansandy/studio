@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, useMemo } from "react";
-import { chatAssistantMedicationGuidance } from "@/ai/flows/chat-assistant-medication-guidance";
+import { chatAssistantMedicationGuidance, type ChatAssistantMedicationGuidanceInput } from "@/ai/flows/chat-assistant-medication-guidance";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -20,6 +20,8 @@ interface ChatMessage {
     sender: 'user' | 'ai';
     text: string;
     timestamp?: Timestamp | any;
+    isUserMessage?: boolean;
+    messageText?: string;
 }
 
 export default function ChatInterface() {
@@ -28,6 +30,7 @@ export default function ChatInterface() {
 
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [clientMessages, setClientMessages] = useState<ChatMessage[]>([]);
     const scrollAreaRef = useRef<HTMLDivElement>(null);
 
     // --- Data Fetching ---
@@ -55,11 +58,13 @@ export default function ChatInterface() {
       return collection(firestore, `users/${user.uid}/chatMessages`);
     }, [firestore, user]);
     
-    const [clientMessages, setClientMessages] = useState<ChatMessage[]>([]);
-
     useEffect(() => {
         if (messages) {
-            setClientMessages(messages.map(m => ({ ...m, sender: m.isUserMessage ? 'user' : 'ai', text: m.messageText })));
+             setClientMessages(messages.map(m => ({ 
+                ...m, 
+                sender: m.isUserMessage ? 'user' : 'ai', 
+                text: m.messageText || '' 
+            })));
         } else if (messages === null && !messagesLoading) {
             setClientMessages([{ sender: 'ai', text: 'Hello! How can I help you with your medications today?' }]);
         }
@@ -67,9 +72,12 @@ export default function ChatInterface() {
 
 
     useEffect(() => {
-        if (scrollAreaRef.current) {
-            scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
-        }
+        // Scroll to the bottom whenever messages change
+        setTimeout(() => {
+             if (scrollAreaRef.current) {
+                scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+            }
+        }, 100);
     }, [clientMessages]);
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -77,7 +85,7 @@ export default function ChatInterface() {
         if (!input.trim() || isLoading || !chatMessagesCollectionRef) return;
 
         const userMessageText = input;
-        const userMessageForUI: ChatMessage = { sender: 'user', text: userMessageText };
+        const userMessageForUI: ChatMessage = { sender: 'user', text: userMessageText, timestamp: new Date() };
         setClientMessages(prev => [...prev, userMessageForUI]);
         setInput('');
         setIsLoading(true);
@@ -90,22 +98,30 @@ export default function ChatInterface() {
         });
 
         try {
-            const { response } = await chatAssistantMedicationGuidance({ 
+            const aiInput: ChatAssistantMedicationGuidanceInput = {
                 query: userMessageText,
-                prescriptions: prescriptions?.map(p => ({
+            };
+
+            if (prescriptions) {
+                aiInput.prescriptions = prescriptions.map(p => ({
                     name: p.name,
                     date: p.date,
                     safetyScore: p.safetyScore,
                     issues: p.issues,
-                })) || [],
-                medications: medications?.map(m => ({
+                }));
+            }
+
+            if (medications) {
+                 aiInput.medications = medications.map(m => ({
                     name: m.name,
                     stockQuantity: m.stock,
                     expiryDate: m.expiryDate,
-                })) || [],
-            });
+                }));
+            }
 
-            const aiMessageForUI: ChatMessage = { sender: 'ai', text: response };
+            const { response } = await chatAssistantMedicationGuidance(aiInput);
+
+            const aiMessageForUI: ChatMessage = { sender: 'ai', text: response, timestamp: new Date() };
             setClientMessages(prev => [...prev, aiMessageForUI]);
 
             // Save AI message to Firestore
@@ -117,7 +133,7 @@ export default function ChatInterface() {
 
         } catch (error) {
             console.error("Chat API error:", error);
-            const errorMessage: ChatMessage = { sender: 'ai', text: 'Sorry, I encountered an error. Please try again.' };
+            const errorMessage: ChatMessage = { sender: 'ai', text: 'Sorry, I encountered an error. Please try again.', timestamp: new Date() };
             setClientMessages(prev => [...prev, errorMessage]);
         } finally {
             setIsLoading(false);
@@ -133,22 +149,23 @@ export default function ChatInterface() {
     };
     
     const hasError = messagesError || prescriptionsError || medicationsError;
+    const initialLoading = messagesLoading && !messages;
 
     return (
         <Card className="flex flex-col flex-grow">
             <CardContent className="flex-grow p-0">
-                <ScrollArea className="h-[calc(100vh-18rem)] p-4" ref={scrollAreaRef}>
-                    {hasError && (
-                        <Alert variant="destructive" className="mb-4">
-                            <AlertTriangle className="h-4 w-4" />
-                            <AlertTitle>Error</AlertTitle>
-                            <AlertDescription>
-                                There was a problem loading your data. Some features might not work correctly.
-                            </AlertDescription>
-                        </Alert>
-                    )}
-                    <div className="space-y-6">
-                        {messagesLoading && !messages ? (
+                <ScrollArea className="h-[calc(100vh-18rem)]" ref={scrollAreaRef}>
+                     <div className="p-4 space-y-6">
+                        {hasError && (
+                            <Alert variant="destructive" className="mb-4">
+                                <AlertTriangle className="h-4 w-4" />
+                                <AlertTitle>Error</AlertTitle>
+                                <AlertDescription>
+                                    There was a problem loading your data. Some features might not work correctly.
+                                </AlertDescription>
+                            </Alert>
+                        )}
+                        {initialLoading ? (
                              <div className="flex items-center justify-center p-8">
                                 <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                             </div>
@@ -156,7 +173,7 @@ export default function ChatInterface() {
                             <>
                                 {clientMessages.map((message, index) => (
                                     <div
-                                        key={message.id || index}
+                                        key={message.id || `msg-${index}`}
                                         className={cn(
                                             "flex items-start gap-3",
                                             message.sender === 'user' ? "justify-end" : "justify-start"
@@ -175,11 +192,11 @@ export default function ChatInterface() {
                                                     : "bg-muted"
                                             )}
                                         >
-                                            {message.text}
+                                            <p className="whitespace-pre-wrap">{message.text}</p>
                                         </div>
                                         {message.sender === 'user' && (
                                             <Avatar className="h-8 w-8">
-                                                <AvatarImage src={user?.uid ? `https://i.pravatar.cc/40?u=${user.uid}` : undefined} />
+                                                <AvatarImage src={user?.photoURL || undefined} />
                                                 <AvatarFallback>{user ? getInitials(user.displayName) : <User size={20}/>}</AvatarFallback>
                                             </Avatar>
                                         )}
@@ -210,6 +227,7 @@ export default function ChatInterface() {
                     />
                     <Button type="submit" disabled={isLoading || messagesLoading || !input.trim()} size="icon">
                         <Send className="h-4 w-4" />
+                        <span className="sr-only">Send message</span>
                     </Button>
                 </form>
             </CardFooter>

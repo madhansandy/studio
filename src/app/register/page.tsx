@@ -2,37 +2,56 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuth, useFirestore } from '@/firebase';
+import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { setDoc, doc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { HeartPulse, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { FirebaseClientProvider } from '@/firebase';
+import { useRouter } from 'next/navigation';
 
-export default function RegisterPage() {
-  const { register } = useAuth();
+function RegisterComponent() {
+  const auth = useAuth();
+  const firestore = useFirestore();
   const { toast } = useToast();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!auth || !firestore) return;
     setIsLoading(true);
     try {
-      await register(name, email, password);
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+      
+      // Update profile and create user document
+      await Promise.all([
+        updateProfile(user, { displayName: name }),
+        setDoc(doc(firestore, "users", user.uid), {
+          name: name,
+          email: user.email,
+        })
+      ]);
+
       toast({
         title: "Registration Successful",
         description: "Your account has been created.",
       });
-    } catch (error) {
+      router.push('/dashboard');
+    } catch (error: any) {
       console.error(error);
       toast({
         variant: "destructive",
         title: "Registration Failed",
-        description: "Could not create your account. Please try again.",
+        description: error.message || "Could not create your account. Please try again.",
       });
       setIsLoading(false);
     }
@@ -86,8 +105,7 @@ export default function RegisterPage() {
                 />
               </div>
               <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Create Account
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Create Account"}
               </Button>
             </div>
           </form>
@@ -101,4 +119,12 @@ export default function RegisterPage() {
       </Card>
     </div>
   );
+}
+
+export default function RegisterPage() {
+    return (
+        <FirebaseClientProvider>
+            <RegisterComponent />
+        </FirebaseClientProvider>
+    )
 }

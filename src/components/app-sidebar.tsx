@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Sidebar,
   SidebarHeader,
@@ -25,7 +25,8 @@ import {
   LogOut,
   ChevronLeft,
 } from "lucide-react";
-import { useAuth } from "@/hooks/use-auth";
+import { useUser, useAuth } from "@/firebase";
+import { signOut } from "firebase/auth";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import {
   DropdownMenu,
@@ -49,9 +50,19 @@ const navItems = [
 
 export default function AppSidebar() {
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const { user } = useUser();
+  const auth = useAuth();
+  const router = useRouter();
 
-  const getInitials = (name: string) => {
+  const handleLogout = async () => {
+    if (auth) {
+      await signOut(auth);
+      router.push('/login');
+    }
+  };
+
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return "U";
     return name
       .split(" ")
       .map((n) => n[0])
@@ -96,11 +107,11 @@ export default function AppSidebar() {
             <Button variant="ghost" className="h-auto w-full justify-start p-2">
               <div className="flex w-full items-center gap-2">
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={user?.id ? `https://i.pravatar.cc/40?u=${user.id}` : undefined} />
-                  <AvatarFallback>{user ? getInitials(user.name) : "U"}</AvatarFallback>
+                  <AvatarImage src={user?.photoURL || undefined} />
+                  <AvatarFallback>{user ? getInitials(user.displayName) : "U"}</AvatarFallback>
                 </Avatar>
                 <div className="truncate text-left">
-                  <p className="font-medium">{user?.name}</p>
+                  <p className="font-medium">{user?.displayName}</p>
                   <p className="text-xs text-muted-foreground">{user?.email}</p>
                 </div>
               </div>
@@ -109,7 +120,7 @@ export default function AppSidebar() {
           <DropdownMenuContent side="right" align="start" className="w-56">
             <DropdownMenuLabel>My Account</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={logout}>
+            <DropdownMenuItem onClick={handleLogout}>
               <LogOut className="mr-2 h-4 w-4" />
               <span>Log out</span>
             </DropdownMenuItem>

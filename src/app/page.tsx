@@ -2,12 +2,13 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/hooks/use-auth";
+import { useUser } from "@/firebase";
 import { Loader2 } from "lucide-react";
+import { FirebaseClientProvider } from "@/firebase";
 
-export default function Home() {
+function Redirector() {
   const router = useRouter();
-  const { isAuthenticated, loading } = useAuth();
+  const { user: isAuthenticated, isUserLoading: loading } = useUser();
 
   useEffect(() => {
     if (!loading) {
@@ -24,4 +25,12 @@ export default function Home() {
       <Loader2 className="h-8 w-8 animate-spin text-primary" />
     </div>
   );
+}
+
+export default function Home() {
+  return (
+    <FirebaseClientProvider>
+        <Redirector />
+    </FirebaseClientProvider>
+  )
 }
