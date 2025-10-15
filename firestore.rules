@@ -1,16 +1,118 @@
+/**
+ * @file MediCheck AI Firestore Security Rules
+ *
+ * Core Philosophy:
+ * This ruleset enforces a strict user-ownership model, where each authenticated user (patient) has exclusive access to their own data.
+ *
+ * Data Structure:
+ * All patient-related data (profile, prescriptions, medications, alerts) is nested under the `/users/{userId}` collection, ensuring data isolation.
+ *   - `/users/{userId}`: Stores patient profile information.
+ *   - `/users/{userId}/prescriptions/{prescriptionId}`: Stores uploaded prescriptions.
+ *   - `/users/{userId}/medications/{medicationId}`: Stores medication inventory.
+ *   - `/users/{userId}/alerts/{alertId}`: Stores medication alerts.
+ *
+ * Key Security Decisions:
+ *  - Path-based ownership: Access is granted based on the user ID in the path matching the authenticated user's UID.
+ *  - No listing of users: Listing the `/users` collection is implicitly denied.
+ *  - No external access:  The `patientId` field in subcollections is for data linkage only and does not grant external access.
+ *
+ * Denormalization for Authorization:
+ * The `patientId` field is included in `Prescription`, `Medication`, and `Alert` documents but primarily serves as data linkage and does not factor into authorization rules. This avoids the need for `get()` calls in security rules, enabling atomic operations and simplifying debugging.
+ */
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Users can read and write to their own user document.
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    /**
+     * @description Protects the root of the database from unauthorized access.
+     * @path /
+     * @allow (get, list) if false
+     * @deny (create, update, delete) if false
+     * @principle Prevents any direct operations on the root.
+     */
+    match /{document=**} {
+      allow read, write: if false;
+    }
 
-      // Users can read and write to their own subcollections.
-      match /{allSubcollections}/{docId} {
-        allow read, write: if request.auth != null && request.auth.uid == userId;
-      }
+    /**
+     * @description Controls access to user profile documents. Only the authenticated user can read and write their own profile.
+     * @path /users/{userId}
+     * @allow (create) User 'test_user' with id 'test_user' can create their own profile
+     * @allow (get, update, delete) User 'test_user' with id 'test_user' can get, update, or delete their own profile.
+     * @deny (create) User 'another_user' cannot create a profile with id 'test_user'.
+     * @deny (get, update, delete) User 'another_user' cannot get, update, or delete the profile of user 'test_user'.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow list: if false;
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Controls access to prescription documents under a user's profile. Only the authenticated user can manage their own prescriptions.
+     * @path /users/{userId}/prescriptions/{prescriptionId}
+     * @allow (create) User 'test_user' can create a prescription under their profile.
+     * @allow (get, update, delete) User 'test_user' can get, update, or delete a prescription under their profile.
+     * @deny (create) User 'another_user' cannot create a prescription under user 'test_user's profile.
+     * @deny (get, update, delete) User 'another_user' cannot get, update, or delete a prescription under user 'test_user's profile.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId}/prescriptions/{prescriptionId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Controls access to medication documents under a user's profile. Only the authenticated user can manage their own medications.
+     * @path /users/{userId}/medications/{medicationId}
+     * @allow (create) User 'test_user' can create a medication under their profile.
+     * @allow (get, update, delete) User 'test_user' can get, update, or delete a medication under their profile.
+     * @deny (create) User 'another_user' cannot create a medication under user 'test_user's profile.
+     * @deny (get, update, delete) User 'another_user' cannot get, update, or delete a medication under user 'test_user's profile.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId}/medications/{medicationId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Controls access to alert documents under a user's profile. Only the authenticated user can manage their own alerts.
+     * @path /users/{userId}/alerts/{alertId}
+     * @allow (create) User 'test_user' can create an alert under their profile.
+     * @allow (get, update, delete) User 'test_user' can get, update, or delete an alert under their profile.
+     * @deny (create) User 'another_user' cannot create an alert under user 'test_user's profile.
+     * @deny (get, update, delete) User 'another_user' cannot get, update, or delete an alert under user 'test_user's profile.
+     * @principle Enforces document ownership for all operations.
+     */
+    match /users/{userId}/alerts/{alertId} {
+      allow get: if isOwner(userId);
+      allow list: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isExistingOwner(userId);
+      allow delete: if isExistingOwner(userId);
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
     }
   }
 }
