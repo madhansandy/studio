@@ -12,9 +12,14 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertTriangle, CheckCircle2, FileImage, FileText, Loader2, ShieldAlert, Stethoscope, BadgeHelp } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useUser, useFirestore, addDocumentNonBlocking } from "@/firebase";
+import { collection, serverTimestamp } from "firebase/firestore";
 
 export default function UploadForm() {
     const { toast } = useToast();
+    const { user } = useUser();
+    const firestore = useFirestore();
+
     const [prescriptionText, setPrescriptionText] = useState("");
     const [prescriptionImage, setPrescriptionImage] = useState<File | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -49,6 +54,15 @@ export default function UploadForm() {
             return;
         }
 
+        if (!user || !firestore) {
+             toast({
+                variant: "destructive",
+                title: "Authentication Error",
+                description: "You must be logged in to upload a prescription.",
+            });
+            return;
+        }
+
         setIsLoading(true);
         setSafetyResult(null);
         setDetailsResult(null);
@@ -72,10 +86,22 @@ export default function UploadForm() {
             if (details) {
                 setDetailsResult(details);
             }
+            
+            // Save to firestore
+            const prescriptionsCollection = collection(firestore, `users/${user.uid}/prescriptions`);
+            addDocumentNonBlocking(prescriptionsCollection, {
+                name: details?.name || "Unknown Medication",
+                provider: details?.provider || "Unknown Provider",
+                safetyScore: score.safetyScore,
+                issues: score.issues,
+                prescriptionText: prescriptionText || `Image: ${prescriptionImage?.name || 'uploaded image'}`,
+                uploadTimestamp: serverTimestamp(),
+                userId: user.uid,
+            });
 
             toast({
                 title: "Verification Complete",
-                description: `Your prescription has been analyzed.`,
+                description: `Your prescription has been analyzed and saved.`,
             });
         } catch (error) {
             console.error("Verification failed:", error);
@@ -215,7 +241,7 @@ export default function UploadForm() {
                                             </AlertDescription>
                                         </Alert>
                                     )}
-                                     {!detailsResult.isFake && (
+                                     {!detailsResult.isFake && prescriptionImage && (
                                         <Alert>
                                             <CheckCircle2 className="h-4 w-4" />
                                             <AlertTitle>Authenticity Check</AlertTitle>

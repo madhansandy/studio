@@ -1,5 +1,6 @@
 // This is a mock API layer. In a real application, these functions would
 // make network requests to a backend service.
+import { DocumentData, DocumentReference, Timestamp } from "firebase/firestore";
 
 export interface User {
   id: string;
@@ -14,6 +15,9 @@ export interface Prescription {
   safetyScore: number;
   issues: string[];
   provider?: string;
+  userId?: string;
+  uploadTimestamp?: Timestamp;
+  prescriptionText?: string;
 }
 
 export interface InventoryItem {

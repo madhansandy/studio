@@ -1,13 +1,34 @@
+"use client";
+
 import PrescriptionCard from "./components/prescription-card";
-import { api, Prescription } from "@/lib/api";
+import { Prescription } from "@/lib/api";
+import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
+import { collection, query, orderBy } from 'firebase/firestore';
+import { Loader2 } from "lucide-react";
 
-async function getPrescriptions(): Promise<Prescription[]> {
-    // In a real app, you'd pass a user ID
-    return api.getPrescriptions("user123");
-}
+export default function PrescriptionsPage() {
+    const { user } = useUser();
+    const firestore = useFirestore();
 
-export default async function PrescriptionsPage() {
-    const prescriptions = await getPrescriptions();
+    const prescriptionsQuery = useMemoFirebase(() => {
+        if (!user || !firestore) return null;
+        return query(collection(firestore, `users/${user.uid}/prescriptions`), orderBy("uploadTimestamp", "desc"));
+    }, [user, firestore]);
+
+    const { data: prescriptions, isLoading } = useCollection<Prescription>(prescriptionsQuery);
+    
+    const formattedPrescriptions = prescriptions?.map(p => ({
+        ...p,
+        date: p.uploadTimestamp?.toDate().toLocaleDateString() ?? 'N/A'
+    }));
+
+    if (isLoading) {
+        return (
+            <div className="flex h-full w-full items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col gap-8">
@@ -15,9 +36,9 @@ export default async function PrescriptionsPage() {
                 <h1 className="text-3xl font-bold tracking-tight">Verified Prescriptions</h1>
                 <p className="text-muted-foreground">Review your past prescription verifications and safety scores.</p>
             </div>
-            {prescriptions.length > 0 ? (
+            {formattedPrescriptions && formattedPrescriptions.length > 0 ? (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                    {prescriptions.map((p) => (
+                    {formattedPrescriptions.map((p) => (
                         <PrescriptionCard key={p.id} prescription={p} />
                     ))}
                 </div>

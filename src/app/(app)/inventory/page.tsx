@@ -1,18 +1,34 @@
+"use client";
+
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { api, InventoryItem } from "@/lib/api";
+import { InventoryItem } from "@/lib/api";
 import InventoryTable from "./components/inventory-table";
+import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
+import { collection } from 'firebase/firestore';
+import { Loader2 } from "lucide-react";
 
-async function getInventory(): Promise<InventoryItem[]> {
-    // In a real app, you'd pass a user ID
-    return api.getInventory("user123");
-}
 
-export default async function InventoryPage() {
-    const inventory = await getInventory();
+export default function InventoryPage() {
+    const { user } = useUser();
+    const firestore = useFirestore();
 
+    const inventoryQuery = useMemoFirebase(() => {
+        if (!user || !firestore) return null;
+        return collection(firestore, `users/${user.uid}/medications`);
+    }, [user, firestore]);
+    const { data: inventory, isLoading } = useCollection<InventoryItem>(inventoryQuery);
+
+    if (isLoading) {
+        return (
+            <div className="flex h-full w-full items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+        );
+    }
+    
     return (
         <div className="flex flex-col gap-8">
             <div>
@@ -22,7 +38,16 @@ export default async function InventoryPage() {
 
             <div className="grid gap-8 lg:grid-cols-3">
                 <div className="lg:col-span-2">
-                    <InventoryTable data={inventory} />
+                   {inventory ? (
+                        <InventoryTable data={inventory} />
+                   ) : (
+                       <Card>
+                           <CardContent className="flex flex-col items-center justify-center p-12 text-center">
+                               <h3 className="text-xl font-semibold">No Inventory Found</h3>
+                               <p className="text-muted-foreground">Add medications to your inventory to see them here.</p>
+                           </CardContent>
+                       </Card>
+                   )}
                 </div>
                 <div>
                     <Card>

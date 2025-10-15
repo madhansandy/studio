@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, useMemo } from "react";
+import { useState, useRef, useEffect } from "react";
 import { chatAssistantMedicationGuidance, type ChatAssistantMedicationGuidanceInput } from "@/ai/flows/chat-assistant-medication-guidance";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -9,8 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Send, Loader2, User, Bot, AlertTriangle } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
-import { useUser, useFirestore, useCollection, useMemoFirebase } from "@/firebase";
-import { addDocumentNonBlocking } from "@/firebase/non-blocking-updates";
+import { useUser, useFirestore, useCollection, addDocumentNonBlocking, useMemoFirebase } from "@/firebase";
 import { collection, query, orderBy, serverTimestamp, Timestamp } from "firebase/firestore";
 import type { Prescription, InventoryItem } from "@/lib/api";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -54,8 +53,8 @@ export default function ChatInterface() {
     // --- End Data Fetching ---
 
     const chatMessagesCollectionRef = useMemoFirebase(() => {
-      if (!firestore || !user) return null;
-      return collection(firestore, `users/${user.uid}/chatMessages`);
+        if (!firestore || !user) return null;
+        return collection(firestore, `users/${user.uid}/chatMessages`);
     }, [firestore, user]);
     
     useEffect(() => {
@@ -75,7 +74,10 @@ export default function ChatInterface() {
         // Scroll to the bottom whenever messages change
         setTimeout(() => {
              if (scrollAreaRef.current) {
-                scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+                const viewport = scrollAreaRef.current.querySelector('div[data-radix-scroll-area-viewport]');
+                if (viewport) {
+                    viewport.scrollTo({ top: viewport.scrollHeight, behavior: 'smooth' });
+                }
             }
         }, 100);
     }, [clientMessages]);
@@ -105,7 +107,7 @@ export default function ChatInterface() {
             if (prescriptions) {
                 aiInput.prescriptions = prescriptions.map(p => ({
                     name: p.name,
-                    date: p.date,
+                    date: p.uploadTimestamp?.toDate().toLocaleDateString() ?? 'N/A',
                     safetyScore: p.safetyScore,
                     issues: p.issues,
                 }));
