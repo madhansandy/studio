@@ -40,12 +40,12 @@ import { Button } from "./ui/button";
 
 const navItems = [
   { href: "/dashboard", icon: LayoutDashboard, label: "Dashboard" },
-  { href: "/prescriptions", icon: ClipboardList, label: "Prescriptions" },
-  { href: "/inventory", icon: Boxes, label: "Stock & Alerts" },
-  { href: "/locator", icon: MapPin, label: "Locator" },
-  { href: "/reports", icon: BarChart3, label: "Reports" },
   { href: "/chat", icon: MessageCircle, label: "Chat Assistant" },
-  { href: "/upload", icon: Upload, label: "Upload" },
+  { href: "/prescriptions", icon: ClipboardList, label: "Verified Prescriptions" },
+  { href: "/inventory", icon: Boxes, label: "Stock & Alerts" },
+  { href: "/locator", icon: MapPin, label: "Healthcare Locator" },
+  { href: "/reports", icon: BarChart3, label: "Insights" },
+  { href: "/upload", icon: Upload, label: "Upload New" },
 ];
 
 export default function AppSidebar() {
@@ -71,17 +71,16 @@ export default function AppSidebar() {
 
   return (
     <Sidebar>
-      <SidebarHeader>
-        <div className="flex items-center gap-2">
-          <HeartPulse className="h-8 w-8 text-primary" />
-          <h1 className="text-xl font-semibold">MediCheck AI</h1>
-          <SidebarTrigger className="ml-auto md:hidden">
-            <ChevronLeft />
-          </SidebarTrigger>
+      <SidebarHeader className="p-4">
+        <div className="flex items-center gap-3">
+          <div className="bg-primary p-1.5 rounded-lg">
+            <HeartPulse className="h-6 w-6 text-white" />
+          </div>
+          <h1 className="text-xl font-bold text-primary">MediCheck AI</h1>
         </div>
       </SidebarHeader>
 
-      <SidebarContent>
+      <SidebarContent className="px-2">
         <SidebarMenu>
           {navItems.map((item) => (
             <SidebarMenuItem key={item.href}>
@@ -89,10 +88,11 @@ export default function AppSidebar() {
                 asChild
                 isActive={pathname === item.href}
                 tooltip={item.label}
+                className="py-6"
               >
-                <a href={item.href}>
-                  <item.icon />
-                  <span>{item.label}</span>
+                <a href={item.href} className="flex items-center gap-3">
+                  <item.icon className={pathname === item.href ? "text-primary" : "text-muted-foreground"} />
+                  <span className="font-medium">{item.label}</span>
                 </a>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -100,29 +100,29 @@ export default function AppSidebar() {
         </SidebarMenu>
       </SidebarContent>
 
-      <SidebarFooter>
-        <SidebarSeparator />
+      <SidebarFooter className="p-4">
+        <SidebarSeparator className="mb-4" />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-auto w-full justify-start p-2">
-              <div className="flex w-full items-center gap-2">
-                <Avatar className="h-8 w-8">
+            <Button variant="ghost" className="h-auto w-full justify-start p-2 hover:bg-sidebar-accent">
+              <div className="flex w-full items-center gap-3">
+                <Avatar className="h-9 w-9 border-2 border-primary/20">
                   <AvatarImage src={user?.photoURL || undefined} />
-                  <AvatarFallback>{user ? getInitials(user.displayName) : "U"}</AvatarFallback>
+                  <AvatarFallback className="bg-primary/10 text-primary">{user ? getInitials(user.displayName) : "U"}</AvatarFallback>
                 </Avatar>
                 <div className="truncate text-left">
-                  <p className="font-medium">{user?.displayName}</p>
-                  <p className="text-xs text-muted-foreground">{user?.email}</p>
+                  <p className="font-semibold text-sm">{user?.displayName || "Guest User"}</p>
+                  <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
                 </div>
               </div>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent side="right" align="start" className="w-56">
-            <DropdownMenuLabel>My Account</DropdownMenuLabel>
+            <DropdownMenuLabel>Account Settings</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout}>
+            <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
               <LogOut className="mr-2 h-4 w-4" />
-              <span>Log out</span>
+              <span>Sign Out</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
